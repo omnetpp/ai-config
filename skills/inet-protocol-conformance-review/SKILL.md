@@ -211,6 +211,11 @@ data, it feeds P7b, and it appears in the report only inside a finding's body.
 
 Allocate a finding ID to every row that is not `Full`. The format is `<FAMILY>-<NNN>`.
 
+**Keep every agent's full return in the working data, keyed by row ID.** Do not reduce it to the
+matrix columns. P8 files it into the finding's context directory, where a planning agent reads it.
+The same applies to P4b, P5, P6, P7 and P7b: the matrix holds the verdict, and the context
+directory holds the reasoning.
+
 ### P4b — Catch-up mapping
 
 Map the rows P3b produced, by the same rules. One agent is normally enough.
@@ -237,7 +242,8 @@ finding that shares its mechanism.
 For every remaining row a mapping agent marked as a candidate `Incorrect`, build a minimal simulation
 that shows the behavior. If it reproduces, the status stays `Incorrect`, and the evidence names the
 configuration and the observation. If it does not reproduce, downgrade to `Suspect` and say what
-was tried.
+was tried. Keep the notes of every attempt, including the failed ones. They go into the finding's
+`reproduction.md` at P8, so the next agent does not repeat the attempt.
 
 **The reproduction tests are a deliverable, not scratch work.** They are the only executable proof
 the report contains, and the defects they cover are usually untested — that is often why the defect
@@ -278,8 +284,10 @@ support it — a claim resting on a misread line is a wrong claim even when its 
 **Judge `level` as a separate verdict, not as a detail of the status.** An agent asked only "is the
 status right" will not question the modal. The IPv4 pilot mis-levelled in both directions.
 
-Record the verdict per finding. Drop refuted findings from the matrix, and note the counts in the
-method line. That number is what makes the surviving findings credible: the pilot changed 12 of the
+Record the verdict and its reason per finding, and keep the refuted ones in the working data. A
+refuted claim about a piece of code is useful context for a surviving finding about the same code,
+and it goes into that finding's `refutation.md` at P8. Drop refuted findings from the matrix, and
+note the counts in the method line. That number is what makes the surviving findings credible: the pilot changed 12 of the
 70 claims this pass examined.
 
 ### P7b — False-`Full` hunt
@@ -313,6 +321,28 @@ means, not about what the code does.
 ### P8 — Assembly
 
 Write the report from [report-template.md](report-template.md). Update the index.
+
+**Group rows into root-cause findings, then order the findings by priority.** One defect commonly
+spans several rows. The finding entry is the unit a maintainer plans against, so it names every row
+it explains. Priority is derived from status, impact, and level by the table in
+[finding-classes.md](finding-classes.md). Never let an agent set it and never adjust it by hand: the
+order must be reproducible from the matrix alone.
+
+**Write a `Context` field for every finding**, three to five sentences, for an agent that will plan
+the fix and has read nothing else. [report-template.md](report-template.md) says what it must
+answer. This is the one part of the report written for a machine reader rather than a maintainer, and
+it is the part later agents will actually act on. Do not delegate it to an agent that has not seen
+the code: write it from the mapping and reproduction notes, or give the agent those notes.
+
+**File the working data into context directories**, one per finding at
+`doc/protocols/<family>/findings/<id>/`. Everything the run produced about the finding goes there:
+the rows with their `checked:` lists, the mapping notes, the reproduction attempts, the refutation
+verdicts, and test recommendations for rows no committed test covers. The template names the files.
+A planning agent receives this directory as its initial context. Nothing in it is spec text.
+
+**Run [validate-report.py](validate-report.py) before the checkpoint.** It enforces the priority
+order, the `Context` field, the context directories, and every link. Dangling links and a missing
+`Context` fail the checkpoint.
 
 **Publish the report's own verification coverage**, as a table in section 2: per status, how many
 rows exist, how many were verified, by what method, and how many were not. A reader cannot judge how
@@ -367,10 +397,19 @@ One bookmark per family, named `protocol-review/<family>`. Four commits:
 1. `docs(<family>): protocol review spec manifest`
 2. `docs(<family>): protocol review scope statement`
 3. `docs(<family>): protocol conformance tests for <family>`
-4. `docs(<family>): protocol conformance review report`
+4. `docs(<family>): protocol conformance review report` — the report, the matrix, the
+   `findings/` directories, and the index update
 
 Commits 1, 2, and 4 touch documentation only. Commit 3 adds tests, and every test in it must report
 `EXPECTEDFAIL` before it lands. Do not push without asking.
+
+Commit 2 is optional when the scope statement is written as section 1 of the report file and that
+file grows into the full report before the tests exist. The IPv6 run folded it into commit 4. Either
+way, the scope statement must be on disk and approved before P3 starts.
+
+`jj split` needs an interactive editor and fails in this environment ("Standard output is not a
+terminal"). To separate files into their own commit, move them out of the tree to `$TMPDIR`, run
+`jj new -m "<message>"`, and move them back.
 
 ## Identity across re-runs
 
@@ -394,7 +433,8 @@ The report carries its own history.
 Only when the user asks:
 
 - workstream plans in `~/w/ai/ai-plans/plans/pending/`, grouped by theme, each item citing its
-  finding ID,
+  finding ID. The planning agent receives the finding entry — above all its `Context` field — and
+  the finding's `findings/<id>/` directory as initial context. Write both for that reader.
 - conformance test cases through the `generic-protocol-test-authoring` skill, for rows with status
   `Partial`, `Incorrect`, or `Suspect`.
 

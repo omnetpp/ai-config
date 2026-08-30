@@ -52,6 +52,13 @@ has been wrong.
 `level` comes from the spec text: `MUST`, `SHOULD`, or `MAY`. Keep it. A `MUST` violation outranks
 a `SHOULD` violation, and the two must never merge into one severity number.
 
+`MUST NOT` and `SHOULD NOT` are the negative forms of `MUST` and `SHOULD`. They bind exactly as
+strongly, and every rule that names `MUST` or `SHOULD` covers them.
+
+A fourth value, `STRUCTURAL`, marks a wire format, a constant, or a field definition that the text
+states without a modal verb. A format admits no alternative, so `STRUCTURAL` binds like `MUST`. Use
+it only where the clause defines a format or a value. Prose with an implied obligation is `MUST`.
+
 ### Permissive clauses
 
 A `MAY`, and anything from an Informational document, grants latitude rather than imposing an
@@ -80,6 +87,37 @@ one half holds and the other does not, however well the first half is implemente
 
 This produced the pilot's only confirmed wrong row. Watch for a summary containing "and", or naming
 two actions.
+
+## Priority
+
+The report orders findings for a maintainer who fixes the worst thing first. `priority` is
+**derived, not judged**. Compute it from status, impact, and level with this table. Never adjust it
+by hand, and never let an agent set it. A finding that groups several rows takes the priority of its
+strongest row.
+
+| Priority | Rule | What it means to a planner |
+|---|---|---|
+| `P1` | `Incorrect`, impact `results` or `scope` | The code contradicts the standard, and a committed test proves it. Fix first. |
+| `P2` | `Suspect`, impact `results` or `scope` | The code probably contradicts the standard. Nobody reproduced it. Reproduce first, then fix. |
+| `P3` | `Missing` or `Partial`, level `MUST` or `STRUCTURAL`, impact `results` | A binding requirement is absent, and a normal simulation that touches it gives wrong results. |
+| `P4` | `Missing` or `Partial`, level `MUST` or `STRUCTURAL`, impact `scope` | A binding requirement is absent. A study that needs it cannot run. |
+| `P5` | `Missing` or `Partial`, level `SHOULD`, impact `results` or `scope` | A recommendation is absent. |
+| `P6` | any finding with impact `cosmetic` | Housekeeping. Affects neither results nor the range of studies. |
+
+A finding that groups several rows takes the **worst** status, the **strongest** impact, and the
+**strongest** level among its rows, and derives one priority from those three.
+
+One exception, and it exists for a measured reason. **`Suspect` counts as the worst status only when
+it is the finding's most common gap status.** Otherwise the finding takes the worst status among its
+remaining rows, and its row-status line still shows how many `Suspect` rows it carries. Without this
+rule one unreproduced row promotes a thirty-row capability gap to `P2` and tells the planner to
+reproduce first, when the first action is to implement the capability. The IPv6 review had 14
+findings in that position, covering 121 rows.
+
+Within one priority, order by ID. The order says nothing about effort. A `P1` may be a one-line fix
+and a `P4` may be a new module. Effort belongs in the plan, not in the report.
+
+`Non-gap` and `Full` rows carry no finding and no priority.
 
 ## Finding identifiers
 

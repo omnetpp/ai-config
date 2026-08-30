@@ -41,6 +41,9 @@ def main():
     ap.add_argument("--root", default=".")
     ap.add_argument("--deprecated", default="",
                     help="comma-separated message types a spec-set document deprecates")
+    ap.add_argument("--post-p6", action="store_true",
+                    help="the matrix has been through P6; a plain `Incorrect` is "
+                         "allowed, but must cite a reproduction test")
     a = ap.parse_args()
 
     spec = load(a.spec, 7)
@@ -80,9 +83,29 @@ def main():
                 errors += 1
 
         # 2. A clause with two obligations needs a verdict for each.
+        #    " and " inside a noun list ("Flow Label, Source Address and
+        #    Destination Address") is one obligation, not two. The IPv6 run
+        #    raised 36 of these and only a handful were real, so a comma before
+        #    the conjunction downgrades the check to a warning.
         if " and " in summary.lower() and checked.count("[") < 2:
-            print(f"ERROR {rid}: summary states two obligations, `checked` has "
-                  f"{checked.count('[')} entry")
+            head = summary.lower().split(" and ")[0]
+            if "," in head:
+                print(f"WARN  {rid}: `and` may join a noun list rather than two "
+                      f"obligations - confirm one verdict is enough")
+                warns += 1
+            else:
+                print(f"ERROR {rid}: summary states two obligations, `checked` has "
+                      f"{checked.count('[')} entry")
+                errors += 1
+
+        # 2b. A permissive clause cannot be violated, so it cannot be a gap.
+        #     The IPv6 run found 11 MAY rows graded Missing or Partial. Grading
+        #     an unexercised permission as a gap fills the report with rows that
+        #     are not defects. See finding-classes.md, "Permissive clauses".
+        if s[3] == "MAY" and status in ("Missing", "Partial", "Incorrect?",
+                                        "Incorrect", "Suspect"):
+            print(f"ERROR {rid}: level MAY graded {status} - a permission cannot "
+                  f"be violated; use Full, or Non-gap naming the absent capability")
             errors += 1
 
         # 3. A status other than Full/Non-gap must carry an impact.
@@ -91,9 +114,17 @@ def main():
             errors += 1
 
         # 4. The evidence rule: no plain Incorrect before reproduction.
-        if status == "Incorrect":
+        #    After P6 has run, the orchestrator promotes reproduced rows to a
+        #    plain `Incorrect`, so pass --post-p6 to validate a finished matrix.
+        #    Without that flag the check would make a completed matrix
+        #    unvalidatable, which the IPv6 run hit at merge time.
+        if status == "Incorrect" and not a.post_p6:
             print(f"ERROR {rid}: plain `Incorrect` — only P6 may set it, "
                   f"agents write `Incorrect?`")
+            errors += 1
+        if status == "Incorrect" and a.post_p6 and ".test" not in evidence:
+            print(f"ERROR {rid}: `Incorrect` after P6 but the evidence names no "
+                  f"reproduction test")
             errors += 1
 
         # 5. Agents never decide a simplification.
